@@ -1,0 +1,10 @@
+{
+    "press": {
+        "name": "My Press",
+        "domain": "localhost:8000",
+        "main_contact": "admin@example.com",
+        "system_email": "admin@example.com",
+        "theme": "default",
+        "is_secure": false
+    }
+} 

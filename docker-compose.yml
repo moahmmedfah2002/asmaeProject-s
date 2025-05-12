@@ -1,0 +1,147 @@
+version: "3.8"
+
+services:
+
+
+
+  janeway-postgres:
+      image: postgres:13
+      volumes:
+        - ./db/postgres-data:/var/lib/postgresql/data
+      environment:
+        POSTGRES_PASSWORD: janeway
+        POSTGRES_USER: janeway
+        POSTGRES_DB: janeway
+      ports:
+        - "5432:5432"
+
+  janeway-web:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile
+    volumes:
+      - ./src:/vol/janeway/src
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_VENDOR=postgres
+      - DB_HOST=janeway-postgres
+      - DB_PORT=5432
+      - DB_PASSWORD=janeway
+      - DB_USER=janeway
+      - DB_NAME=janeway
+      - JANEWAY_SETTINGS_MODULE=core.dev_settings
+    depends_on:
+      janeway-postgres:
+        condition: service_healthy
+
+  janeway-debug-smtp:
+      image: python:3.8
+      command: python -u -m smtpd -c DebuggingServer -n 0.0.0.0:1025
+
+#  janeway-postgres:
+#    image: postgres:latest
+#    volumes:
+#      - ./db/postgres-data:/var/lib/postgresql/data
+#    ports:
+#      - "${POSTGRES_PORT:-5432}:5432"
+#    environment:
+#      - POSTGRES_PASSWORD=${DB_PASSWORD}
+#      - POSTGRES_USER=${DB_USER}
+#      - POSTGRES_DB=${DB_NAME}
+#    depends_on:
+#      - janeway-pgadmin
+#    restart: unless-stopped
+
+  janeway-pgadmin:
+    image: dpage/pgadmin4
+    user: root
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - ./db/pgadmin:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=dev@janeway.systems
+      - PGADMIN_DEFAULT_PASSWORD=${DB_PASSWORD}
+      - PGADMIN_SERVER_JSON_FILE=/var/lib/pgadmin/servers.json
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    restart: unless-stopped
+
+  janeway-mysql:
+    image: mysql:latest
+    volumes:
+      - ./db/mysql-data:/var/lib/mysql
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      -  MYSQL_LOWER_CASE_TABLE_NAMES=1
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_DATABASE=${DB_NAME}
+
+    restart: unless-stopped
+
+  janeway-mariadb:
+    image: mariadb:latest
+    volumes:
+      - ./db/mariadb-data:/var/lib/mysql
+    ports:
+      - "${MARIADB_PORT:-3307}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_DATABASE=${DB_NAME}
+    restart: unless-stopped
+
+  start_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - "janeway-${DB_VENDOR}"
+      - janeway-debug-smtp
+    command: "janeway-janeway-${DB_VENDOR}:${DB_PORT}"
+
+#  janeway-web:
+#    build:
+#      context: .
+#      dockerfile: dockerfiles/Dockerfile
+#    volumes:
+#      - ./src:/vol/janeway/src
+#      - ./lib:/vol/janeway/lib
+#      - ./logs:/vol/janeway/logs
+#      - ./db/janeway.sqlite3:/db/janeway.sqlite3
+#    ports:
+#      - "8000:8000"
+#      - "${JANEWAY_PORT:-8000}:8000"
+#    environment:
+#      - DB_VENDOR
+#      - DB_HOST
+#      - DB_PORT
+#      - DB_PASSWORD
+#      - DB_USER
+#      - DB_NAME
+#      - PYTHONDONTWRITEBYTECODE=yes
+#      - JANEWAY_SETTINGS_MODULE=core.dev_settings
+#      - NOSE_INCLUDE_EXE=1
+#      - JANEWAY_EMAIL_BACKEND
+#      - JANEWAY_EMAIL_HOST
+#      - JANEWAY_EMAIL_PORT
+#      - JANEWAY_EMAIL_USE_TLS
+#    depends_on:
+#      - start_dependencies
+#    cap_add:
+#      - SYS_PTRACE
+#    restart: unless-stopped
+
+  janeway-sqlite:
+    image: alpine
+    command: tail -f /dev/null
+    volumes:
+      - ./db/janeway.sqlite:/var/lib/janeway.sqlite
+
+#  janeway-debug-smtp:
+#    image: python:3.8
+#    entrypoint: python -u -m smtpd -c DebuggingServer -n 0.0.0.0:1025
+#    restart: unless-stopped
